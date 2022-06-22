@@ -1,0 +1,349 @@
+#!/usr/bin/env python
+#
+########################################################
+#
+# Module storing the metadata for the various datasets 
+#  required for the SC module.
+#
+########################################################
+
+def select_source(sources,Message='Available Sources:'):
+    print Message 
+    for i in range(len(sources)):
+        print str(i)+': '+sources[i]
+
+    iSOURCE = input('Select an option:\n')
+
+    return iSOURCE
+    
+
+def LAI_source_info(JULES_SOURCE_INFO):
+    
+    if (len(JULES_SOURCE_INFO['LAI_sources'][:])==1):
+        iLAI = 0
+    else:
+        iLAI = select_source(JULES_SOURCE_INFO['LAI_sources'][:], \
+                              Message='Select an LAI source: ')
+    
+    LAI_source = JULES_SOURCE_INFO['LAI_sources'][iLAI]
+    
+    if (LAI_source=='JULES_LAI'):
+        LAI_file   = JULES_SOURCE_INFO['file']
+        LAI_tsteps = JULES_SOURCE_INFO['tsteps']
+        LAI_t_res  = JULES_SOURCE_INFO['t_res']
+        LAI_nc_name= 'lai'
+        LAI_tag    = ''
+    elif ('static' in LAI_source) and (JULES_SOURCE_INFO['grid'] == 'WFDEI'):
+        LAI_file   = '/users/eow/edwcom/WFD_EI/qrparm.veg.funcNew3.3.nc'
+        LAI_tsteps = 1 
+        LAI_t_res  = 'yearly'
+        LAI_nc_name= 'field1392'
+        LAI_tag    = 'STATlai'
+    elif ('constant' in LAI_source):
+        LAI_file   = 'Not_Applicable'
+        LAI_tsteps = 1
+        LAI_t_res  = 'yearly'
+        LAI_nc_name= 'Not_Applicable'
+        LAI_tag    = 'CONSTlai'
+    elif (LAI_source=='JULES_pheno_LAI')  and (JULES_SOURCE_INFO['grid'] == 'WFDEI'):
+        LAI_file   = '/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_pheno/' + \
+                     'JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno.monthly_mean.nc'
+        LAI_tsteps = JULES_SOURCE_INFO['tsteps']
+        LAI_t_res  = JULES_SOURCE_INFO['t_res']
+        LAI_nc_name= 'lai'
+        LAI_tag    = 'JPHENOlai'
+    elif ('climatology' in LAI_source) and (JULES_SOURCE_INFO['grid'] == 'CHESS'):
+        LAI_file   = '/prj/chess/data/1km/v1.0/ancil/chess_monthly_lai_UK.nc'
+        LAI_tsteps = 12 
+        LAI_t_res  = 'monthly'
+        LAI_nc_name= 'lai'
+        LAI_tag    = 'CLIMlai'
+
+    
+    LAI_source_info = { 'source': LAI_source, \
+                        'file': LAI_file,     \
+                        'tsteps': LAI_tsteps, \
+                        't_res': LAI_t_res,   \
+                        'nc_name':LAI_nc_name,\
+                        'tag':LAI_tag         \
+                        }
+    
+    return LAI_source_info
+
+
+def PFT_source_info(JULES_SOURCE_INFO):
+   
+    if (len(JULES_SOURCE_INFO['PFT_sources'][:])==1):
+        iPFT=0
+    else:
+        iPFT = select_source(JULES_SOURCE_INFO['PFT_sources'][:], \
+                              Message='Select an PFT source: ')
+    
+    PFT_source = JULES_SOURCE_INFO['PFT_sources'][iPFT]
+    
+    if (PFT_source == 'JULES_PFT'):
+        PFT_file   = JULES_SOURCE_INFO['file']
+        PFT_tsteps = JULES_SOURCE_INFO['tsteps']
+        PFT_t_res  = JULES_SOURCE_INFO['t_res']
+        PFT_nc_name= 'frac'
+        PFT_tag    = ''
+    elif ('static' in PFT_source) and (JULES_SOURCE_INFO['grid'] == 'WFDEI'):
+        PFT_file   = '/users/eow/edwcom/WFD_EI/qrparm.veg.fracNew.nc'
+        PFT_tsteps = 1 
+        PFT_t_res  = 'yearly'
+        PFT_nc_name= 'field1391'
+        PFT_tag    = 'STATpft'
+    elif (PFT_source=='JULES_pheno_PFT')  and (JULES_SOURCE_INFO['grid'] == 'WFDEI'):
+        PFT_file   = '/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_pheno/' + \
+                     'JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno.monthly_mean.nc'
+        PFT_tsteps = JULES_SOURCE_INFO['tsteps']
+        PFT_t_res  = JULES_SOURCE_INFO['t_res']
+        PFT_nc_name= 'frac'
+        PFT_tag    = 'JPHENOpft'
+    elif ('static' in PFT_source) and (JULES_SOURCE_INFO['grid'] == 'CHESS'):
+        PFT_file   = '/prj/chess/data/1km/v1.0/ancil/chess_landcover_2000.nc'
+        PFT_tsteps = 1 
+        PFT_t_res  = 'yearly'
+        PFT_nc_name= 'frac'
+        PFT_tag    = 'STATpft'
+
+    
+    PFT_source_info = { 'source': PFT_source,  \
+                        'file': PFT_file,      \
+                        'tsteps': PFT_tsteps,  \
+                        't_res': PFT_t_res,    \
+                        'nc_name': PFT_nc_name,\
+                        'tag': PFT_tag         \
+                        }
+    
+    return PFT_source_info
+
+def SOIL_source_info(JULES_SOURCE_INFO):
+
+    if (len(JULES_SOURCE_INFO['SOIL_sources'][:])==1):
+        iSOIL=0
+    else:
+        iSOIL=select_source(JULES_SOURCE_INFO['SOIL_sources'][:], \
+                            Message='Select a SOIL source: ')
+    
+    SOIL_source = JULES_SOURCE_INFO['SOIL_sources'][iSOIL]
+    
+    if (SOIL_source=='JULES_SOIL'):
+        SOIL_file  = JULES_SOURCE_INFO['file']
+        SOIL_tsteps = JULES_SOURCE_INFO['tsteps']
+        SOIL_t_res  = JULES_SOURCE_INFO['t_res']
+        SOIL_wilt_nc_name = 'sm_wilt'
+        SOIL_sat_nc_name  = 'sm_sat'
+        SOIL_tag  = ''
+    elif (SOIL_source=='CHESS_ancil_BC'):
+        SOIL_file   = '/prj/chess/data/1km/v1.0/ancil/chess_soilparams_hwsd_bc.nc'
+        SOIL_tsteps = 1
+        SOIL_t_res  = 'yearly'
+        SOIL_wilt_nc_name = 'vwilt'
+        SOIL_sat_nc_name  = 'vsat'
+        SOIL_tag = ''
+
+    SOIL_source_info = {'source':SOIL_source,            \
+                        'file':SOIL_file,                \
+                        'tsteps':SOIL_tsteps,            \
+                        't_res':SOIL_t_res,              \
+                        'wilt_nc_name':SOIL_wilt_nc_name,\
+                        'sat_nc_name':SOIL_sat_nc_name,  \
+                        'tag':SOIL_tag                   \
+                        }
+    
+    return SOIL_source_info
+
+
+def jules_sources_info():
+    
+    JULES_SOURCES = [ 'JULES-WFDEI pheno QS Global',        \
+                      'JULES-WFDEI pheno QS TrifLAI Global',\
+                      'JULES-WFDEI pheno TrifLAI Global',   \
+                      'JULES-WFDEI BigSpin Global',         \
+                      'JULES-WFDEI QuickSpin nocomp Global',\
+                      'JULES-WFDEI TinySpin nocomp Global', \
+                      'JULES-WFDEI BigSpin nocomp Global', \
+                      ]
+        
+
+    JULES_SOURCES_info ={ 'JULES-WFDEI pheno TS Global':                \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_pheno/' + \
+                                   'JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno_TS.monthly_mean.nc',    \
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                      \
+                            'tag':'JULESv43_WFDEI_pheno_Global',                                \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI'],           \
+                            'PFT_sources': ['JULES_PFT','static_PFT'],                          \
+                            'SOIL_sources':['JULES_SOIL']                                            \
+                            },                                \
+                          'JULES-WFDEI pheno QS Global':             \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_pheno/' + \
+                                   'JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno_QS.monthly_mean.nc',    \
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                      \
+                            'tag':'JULESv43_WFDEI_pheno_QS_Global',                             \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI'],           \
+                            'PFT_sources': ['JULES_PFT','static_PFT'],                          \
+                            'SOIL_sources':['JULES_SOIL']                                       \
+                            },                           \
+                          'JULES-WFDEI pheno QS TrifLAI Global':     \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_pheno/' +     \
+                                   'JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno_QS_trifLAI.monthly_mean.nc',\
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                          \
+                            'tag':'JULESv43_WFDEI_pheno_QS_TrifLAI_Global',                         \
+                            'LAI_sources':['JULES_LAI','static_LAI','constant_LAI'],                \
+                            'PFT_sources': ['JULES_PFT','static_PFT'],                              \
+                            'SOIL_sources':['JULES_SOIL']                                           \
+                            },                         \
+                          'JULES-WFDEI pheno TS TrifLAI Global':        \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_pheno/' +   \
+                                   'JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno_TS_trifLAI.monthly_mean.nc', \
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                        \
+                            'tag':'JULESv43_WFDEI_pheno_TrifLAI_Global',                          \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI'],             \
+                            'PFT_sources': ['JULES_PFT','static_PFT'],                            \
+                            'SOIL_sources':['JULES_SOIL']                                            \
+                            },                         \
+                          'JULES-WFDEI BigSpin Global':              \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_TRIFFID/' +  \
+                                   'JULES_v4.3_WFDEI_TRIFFID_RsQ10_GLOBAL_BigSpin.monthly_mean.nc',\
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                         \
+                            'tag':'JULESv43_WFDEI_BigSpin_Global',                                 \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI','JULES_pheno_LAI'], \
+                            'PFT_sources': ['JULES_PFT','static_PFT','JULES_pheno_PFT'],                \
+                            'SOIL_sources':['JULES_SOIL']                                            \
+                            },                         \
+                          'JULES-WFDEI QuickSpin nocomp Global':     \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_nocomp/' +  \
+                                   'J4.3_WFDEI_TRIF_Q10_GLOBAL_QS_nocomp.monthly_mean.nc',             \
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                             \
+                            'tag':'J43_WFDEI_QS_nocomp_Global',                                        \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI'],\
+                            'PFT_sources': ['JULES_PFT'],               \
+                            'SOIL_sources':['JULES_SOIL']                                            \
+                            },                         \
+                          'JULES-WFDEI TinySpin nocomp Global':     \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_nocomp/' + \
+                                   'J4.3_WFDEI_TRIF_Q10_GLOBAL_TS_nocomp.monthly_mean.nc',             \
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',                             \
+                            'tag':'J43_WFDEI_QS_nocomp_Global',                                        \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI'],\
+                            'PFT_sources': ['JULES_PFT'],               \
+                            'SOIL_sources':['JULES_SOIL']                                            \
+                            },                         \
+                          'JULES-WFDEI BigSpin nocomp Global':     \
+                          { 'file':'/users/eow/edwcom/SC_simulator/JULES_output/WFDEI_nocomp/' + \
+                                   'JULES_v4.3_WFDEI_TRIFFID_RsQ10_GLOBAL_BigSpin_nocomp.monthly_mean.nc',\
+                            'grid':'WFDEI','tsteps':396,'t_res':'monthly',              \
+                            'tag':'J43_WFDEI_QS_nocomp_Global',                         \
+                            'LAI_sources': ['JULES_LAI','static_LAI','constant_LAI'],   \
+                            'PFT_sources': ['JULES_PFT'],                  \
+                            'SOIL_sources':['JULES_SOIL']                               \
+                            },                         \
+                      }
+
+    return JULES_SOURCES, JULES_SOURCES_info
+
+
+
+
+def jules_sources_info_chess():
+    
+    JULES_SOURCES = [ 'JULES-CHESS Alberto run (monthly)'   \
+                      ]
+
+    JULES_SOURCES_info = { 'JULES-CHESS Alberto run (monthly)':                             \
+                           { 'file':'/users/global/albmar/CHESS/outputs/' +                 \
+                                   'chess_4.1.month.nc',                                   \
+                             'grid':'CHESS','tsteps':624,'t_res':'monthly',                 \
+                             'tag':'J42_CHESS_albmar_nocomp',                               \
+                             'LAI_sources': ['climatology_LAI','static_LAI','constant_LAI'],\
+                             'PFT_sources': ['static_PFT'],                                 \
+                             'SOIL_sources': ['CHESS_ancil_BC']                             \
+                            }                          \
+                          }
+
+    return JULES_SOURCES, JULES_SOURCES_info
+
+
+def soil_carbon_plot_sources():
+
+    SCsimulator_DIR      = '/users/eow/edwcom/SC_simulator/output/'
+    JULES_output_dir  = '/users/eow/edwcom/SC_simulator/JULES_output/'
+
+    SC_SOURCES = 'JULES (100 year spin)',                           \
+                 'JULES-Triffid Big Spin (1000 year)',              \
+                 'JULES-Triffid Quick Spin (100 year)' ,            \
+                 'JULES-Triffid nocomp Big Spin (1000 year)',       \
+                 'JULES-Triffid nocomp Quick Spin (100 year)',      \
+                 'JULES-Triffid nocomp Tiny Spin (10 year)',        \
+                 'JULES pheno Quick Spin (100 year)',               \
+                 'JULES pheno (TRIF LAI) Quick Spin (100 year)',    \
+                 'JULES pheno Big Spin (10 year)',                  \
+                 'JULES pheno (TRIF LAI) Big Spin (10 year)',       \
+                 'SCsim Static LAI',                                \
+                 'SCsim pheno LAI (100 year spin)',                 \
+                 'SCsim pheno LAI (10 year spin)',                  \
+                 'SCsim pheno LAI with TRIF params (10 year spin)', \
+                 'SCsim BigSpin LAI',                               \
+                 'SCsim Big Spin LAI (all timesteps)',              \
+                 'SCsim Constant LAI',                              \
+                 'SCsim pheno LAI (100 year spin) Climatology'      ]
+
+    SC_SOURCES_info = { \
+            'JULES (100 year spin)':                           \
+             { 'file':JULES_output_dir+'WFDEI_pheno/JULES_v4.3_WFDEI_RsQ10_GLOBAL_pheno.monthly_mean.nc', \
+               'tag':'JULES_100yrspin', \
+              },     \
+            'JULES-Triffid Big Spin (1000 year)':              \
+             { 'file':JULES_output_dir+'WFDEI_TRIFFID/JULES_v4.3_WFDEI_TRIFFID_RsQ10_GLOBAL_BigSpin.monthly_mean.nc',\
+               'tag':'JULES-Trif_1000yrspin',             \
+              },     \
+            'JULES-Triffid Quick Spin (100 year)':              \
+             { 'file':JULES_output_dir+'WFDEI_TRIFFID/JULES_v4.3_WFDEI_TRIFFID_RsQ10_GLOBAL_QuickSpin.monthly_mean.nc', \
+               'tag':'JULES-Trif_100yrspin',   \
+              },     \
+            'JULES-Triffid nocomp Big Spin (1000 year)':       \
+             { 'file':JULES_output_dir+'WFDEI_nocomp/JULES_v4.3_WFDEI_TRIFFID_RsQ10_GLOBAL_BigSpin_nocomp.monthly_mean.nc',\
+               'tag':'JULES-Trif-nocomp_1000yrspin',    \
+              },     \
+            'JULES-Triffid nocomp Quick Spin (100 year)':              \
+             { 'file':JULES_output_dir+'WFDEI_nocomp/J4.3_WFDEI_TRIF_Q10_GLOBAL_QS_nocomp.monthly_mean.nc', \
+               'tag':'JULES-Trif-nocomp_100yrspin',    \
+              },     \
+            'JULES-Triffid nocomp Tiny Spin (100 year)':              \
+             { 'file':JULES_output_dir+'WFDEI_TRIFFID/J4.3_WFDEI_TRIF_Q10_GLOBAL_TS_nocomp.monthly_mean.nc', \
+               'tag':'JULES-Trif-nocomp_10yrspin',   \
+              },     \
+            'SCsim Static LAI':              \
+             { 'file':SCsimulator_DIR+'SCsim_WL_JULES-WFDEI-Zinke-hydro1k_Static_LAI_FastSoilCarbon.nc', \
+               'tag':'SCsim_StatLAI_WLrun',   \
+              },     \
+            'SCsim_phenLAI_AI':              \
+             { 'file':SCsimulator_DIR+'SCsim_WL_JULES-WFDEI-Zinke-hydro1k_Static_LAI_FastSoilCarbon.nc', \
+               'tag':'SCsim_StatLAI_WLrun',   \
+              },     \
+                        
+                        
+                        }
+
+
+                      JULES_output_dir+'WFDEI_nocomp/J4.3_WFDEI_TRIF_Q10_GLOBAL_TS_nocomp.monthly_mean.nc',               \
+                      SCsimulator_DIR+'SCsim_WL_JULES-WFDEI-Zinke-hydro1k_Static_LAI_FastSoilCarbon.nc',                  \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_phenoLAI_MarthewsTI_FastSoilCarbon.nc',                           \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_QSphenoLAI_MarthewsTI_FastSoilCarbon.nc',                         \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_QSphenoLAI_trifparam_MarthewsTI_FastSoilCarbon.nc',               \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_BigSpinLAI_MarthewsTI_FastSoilCarbon.nc',                         \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_BigSpinLAI_alltimesteps_MarthewsTI_FastSoilCarbon.nc',            \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_ConstLAI_alltimesteps_MarthewsTI_FastSoilCarbon.nc',              \
+                      SCsimulator_DIR+'SCsim_J4.3_WFDEI_phenoLAI_MarthewsTI_climatology_FastSoilCarbon.nc'                ]
+
+
+                       'JULES-Trif_100yrspin',              \
+                       'SCsim_StatLAI',                     \
+                       'SCsim_phenLAI_100yrspin',           \
+                       'SCsim_phenLAI_10yrspin',           \
+                       'SCsim_phenLAI_TRIFparams_10yrspin', \
+                       'SCsim_1000yrspinLAI',               \
+                       'SCsim_1000yrspinLAI_allTS',         \
+                       'SCsim_ConstLAI',                    \
+                       'SCsim_phenLAI_100yrspin_climat']

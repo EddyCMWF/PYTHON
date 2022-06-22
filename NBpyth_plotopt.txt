@@ -1,0 +1,3 @@
+plt.rcParams['figure.figsize']=(20,12)
+%matplotlib inline
+

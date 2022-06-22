@@ -1,0 +1,132 @@
+#/bin/env python3.5
+
+import netCDF4 as nc
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+SITE_data_dir='/prj/GREENHOUSE/GREENHOUSE_sites/data/Brattleby/'
+JULES_data_dir='/prj/GREENHOUSE/GREENHOUSE_sites/output/Brattleby/Calibration1/'
+Site='Brattleby'
+tag='_crop_Season'
+
+wk_fit_vars=['lai','canht'] #'shf','lhf']
+JU_fit_vars=['lai','canht'] #'fqw_gb','ftl_gb']
+#SI1_fit_vars=['SHF','LHF']
+#SI2_fit_vars=['H','LE']
+SI_fit_vars=['lai','canht']
+pft_index=5
+
+#Read in SITE data:
+SITE_veg_file=SITE_data_dir+'Brattleby_LAI_Canht_data.nc'
+#SITE_flux_file1=SITE_data_dir+'ConCrop_FullFlux_data_albmar.nc'
+#SITE_flux_file2=SITE_data_dir+'ConCrop_Flux_data.nc'
+
+Sinf=nc.Dataset(SITE_veg_file,'r')
+#SITE_lai=Sinf.variables['lai'][:].squeeze()
+SITE_DICT={ var:Sinf.variables[var][:].squeeze() \
+            for var in SI_fit_vars }
+
+SITE_time=nc.num2date(Sinf.variables['date'][:],        \
+                      units=Sinf.variables['date'].units)
+SITE_panda=pd.DataFrame(SITE_DICT,index=SITE_time)
+Sinf.close()
+
+Sinf=nc.Dataset(SITE_flux_file1,'r')
+SITE_time=nc.num2date( Sinf.variables['date'][:], \
+                       units=Sinf.variables['date'].units )
+SITE_dict={ wkvar:Sinf.variables[invar][:].squeeze()  \
+             for wkvar,invar in zip(wk_fit_vars[1:],SI1_fit_vars) }
+Sinf.close()
+SITE_panda1=pd.DataFrame(SITE_dict,index=SITE_time).resample('D').mean()
+
+Sinf=nc.Dataset(SITE_flux_file2,'r')
+SITE_time=nc.num2date( Sinf.variables['time'][:], \
+                       units=Sinf.variables['time'].units )
+SITE_dict={ wkvar:Sinf.variables[invar][:].squeeze()  \
+              for wkvar,invar in zip(wk_fit_vars[1:],SI2_fit_vars) }
+Sinf.close()
+SITE_panda2=pd.DataFrame(SITE_dict,index=SITE_time).resample('D').mean()
+
+#SITE_panda2=SITE_panda2[SITE_index]
+SITE_panda=pd.concat([SITE_panda1,SITE_panda2])
+SITE_panda=pd.concat([SITE_panda,LAI_DF],axis=1)
+
+SITE_index=((SITE_panda.index>'2011-10-01')&(SITE_panda.index<'2012-09-01')) |\
+           ((SITE_panda.index>'2014-10-01')&(SITE_panda.index<'2015-08-07'))
+SITE_panda=SITE_panda[SITE_index]
+
+TTVEG_opts=['1800','1850','1900','1950','2000','2050']
+alpro_opts=['19.0','20.0','20.5','21.0']
+alpst_opts=['16.0','16.5','17.0','17.5']
+alple_opts=['18.0','18.5','19.0','19.5']
+
+nTTVEG=len(TTVEG_opts)
+nALPRO=len(alpro_opts)
+nALPST=len(alpst_opts)
+nALPLE=len(alple_opts)
+
+template_array=np.zeros([nTTVEG,nALPRO,nALPST,nALPLE])
+stats=['mean','correlation','rmse','rmse_rel','stddev']
+
+STAT_dict = { var: { stat:template_array.copy() for stat in stats } \
+                 for var in wk_fit_vars }
+
+fit_params=['ttveg','alpro','alpst','alple'] 
+PARAM_dict= { param:template_array.copy() for param in fit_params } 
+
+for itvg in range(nTTVEG):
+ for ialpro in range(nALPRO):
+  for ialpst in range(nALPST):
+   for ialple in range(nALPLE):
+       
+       param_vals=[TTVEG_opts[itvg],alpro_opts[ialpro],alpst_opts[ialpst],alple_opts[ialple]]
+       for param,val in zip(fit_params,param_vals):
+           PARAM_dict[param][itvg,ialpro,ialpst,ialple]=float(val)
+
+       pd_list=[]
+    
+       for iSEAS in [1,2]:
+           Jinfile=JULES_data_dir+Site+tag+str(iSEAS)+'_'+ \
+                     TTVEG_opts[itvg]+'_'+   \
+                     alpro_opts[ialpro]+'_'+ \
+                     alpst_opts[ialpst]+'_'+ \
+                     alple_opts[ialple]+     \
+                     '.day.nc'
+
+           Jinf=nc.Dataset(Jinfile,'r')
+           temp_time=nc.num2date( Jinf.variables['time'][:],         \
+                                  units=Jinf.variables['time'].units )
+           temp_dict={ wkvar:Jinf.variables[invar][:].squeeze() \
+                        for wkvar,invar in zip(wk_fit_vars,JU_fit_vars) }
+           Jinf.close()
+           temp_dict['lai']=temp_dict['lai'][:,pft_index]
+           temp_panda=pd.DataFrame(temp_dict,index=temp_time)
+           pd_list.append(temp_panda.copy()) 
+
+       JU_panda=pd.concat(pd_list)
+        
+       for var in wk_fit_vars:
+           STAT_dict[var]['mean'][itvg,ialpro,ialpst,ialple]=(JU_panda+SITE_panda)[var].mean()/2.
+           STAT_dict[var]['rmse'][itvg,ialpro,ialpst,ialple]=(JU_panda-SITE_panda)[var].abs().mean()
+           STAT_dict[var]['stddev'][itvg,ialpro,ialpst,ialple]=(JU_panda-SITE_panda)[var].abs().std()
+           STAT_dict[var]['correlation'][itvg,ialpro,ialpst,ialple]=JU_panda[var].corr(SITE_panda[var])
+           STAT_dict[var]['rmse_rel'][itvg,ialpro,ialpst,ialple] = \
+                   ((JU_panda-SITE_panda)/(JU_panda+SITE_panda))[var].abs().mean()*2.
+
+
+total_RMSE_rel = ( (STAT_dict['lai']['rmse']**2) +     \
+                   (STAT_dict['shf']['rmse_rel']**2) + \
+                   (STAT_dict['lhf']['rmse_rel']**2)  ) ** 0.5
+
+fig,axes=plt.subplots(ncols=4,nrows=1)
+
+for i in range(
+
+
+index=np.where(  (STAT_dict['lai']['correlation']>0.78) \
+               & (STAT_dict['shf']['correlation']>0.42) \
+               & (STAT_dict['lhf']['correlation']>0.61) )
+
+
+

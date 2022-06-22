@@ -1,0 +1,225 @@
+#!/usr/bin/python2.7
+import os
+import netCDF4 as nc
+import numpy as np
+import netcdftime as nctime
+import csv
+import matplotlib.pyplot as plt
+#
+#####################################################################################
+#
+GH_dir     = '/users/eow/edwcom/GREENHOUSE/data/'
+pheno_file = GH_dir+'downscaled_pheno_drivers.csv'
+met_file   = GH_dir+'downscaled_met_drivers.csv'
+#
+canradmod=str(input('Choose a canrad model: '))
+JULES_dir     = '/users/eow/edwcom/GREENHOUSE/data/'
+J_hourly_file = JULES_dir+'JULES_hourly_output.dat.canrad'+canradmod
+J_daily_file  = JULES_dir+'JULES_daily_output.dat.canrad'+canradmod
+#
+# read in pheno data
+pheno_csv=open(pheno_file,'r')
+data=list(csv.reader(pheno_csv,delimiter=','))
+pheno_hdrs=data.pop(0)
+pheno_dict={}
+for hdr in pheno_hdrs:
+    pheno_dict[hdr]=[]
+#
+for dat_lin in data:
+    for hdr,dat in zip(pheno_hdrs,dat_lin):
+        pheno_dict[hdr].append(float(dat))
+#
+pheno_csv.close()
+del data
+#
+# read in the met data    
+met_csv=open(met_file,'r')
+data=list(csv.reader(met_csv,delimiter=','))
+met_hdrs=data.pop(0)
+met_dict={}
+for hdr in met_hdrs:
+    met_dict[hdr]=[]
+#
+for dat_lin in data:
+    for hdr,dat in zip(met_hdrs,dat_lin):
+        met_dict[hdr].append(float(dat))
+#
+met_csv.close()
+del data
+#
+#
+#
+# read in JULES daily data
+J_daily_csv=open(J_daily_file,'r')
+data=list(csv.reader(J_daily_csv,delimiter=','))
+J_daily_hdrs=data.pop(0)
+J_daily_dict={}
+for hdr in J_daily_hdrs:
+    J_daily_dict[hdr]=[]
+#
+for dat_lin in data:
+    for hdr,dat in zip(J_daily_hdrs,dat_lin):
+        J_daily_dict[hdr].append(float(dat))
+#
+J_daily_csv.close()
+del data
+#
+#
+# read in JULES hourly data
+J_hourly_csv=open(J_hourly_file,'r')
+data=list(csv.reader(J_hourly_csv,delimiter=','))
+J_hourly_hdrs=data.pop(0)
+J_hourly_dict={}
+for hdr in J_hourly_hdrs:
+    J_hourly_dict[hdr]=[]
+#
+for dat_lin in data:
+    for hdr,dat in zip(J_hourly_hdrs,dat_lin):
+        J_hourly_dict[hdr].append(float(dat))
+#
+J_hourly_csv.close()
+del data
+#
+#
+
+n_d_points=len(J_daily_dict[J_daily_hdrs[-1]])
+n_h_points=n_d_points*24.
+
+LAI=np.array(J_daily_dict['  LAI '])[:n_d_points]
+GPP=np.array(J_daily_dict['# gpp'])[:n_d_points]*86.4e6
+NPP=np.array(J_daily_dict[' npp'])[:n_d_points]*86.4e6
+TSOIL=np.array(J_daily_dict[' t_soil'])[:n_d_points]
+SM=np.array(J_daily_dict[' SM'])[:n_d_points]
+FSMC=np.array(J_daily_dict[' fsmc'])[:n_d_points]
+PFT=np.array(J_daily_dict['  PFT'])[:n_d_points]
+
+airt_dmax  = np.max(np.array(met_dict['airt']).reshape(49770,24),axis=1)[:n_d_points]
+co2_dmax   = np.max(np.array(met_dict['co2']).reshape(49770,24),axis=1)[:n_d_points]
+wind_dmax  = np.max(np.array(met_dict['wind']).reshape(49770,24),axis=1)[:n_d_points]
+SWRAD_dmax = np.max(np.array(met_dict['SWRAD']).reshape(49770,24),axis=1)[:n_d_points]
+LWRAD_dmax = np.max(np.array(met_dict['LWRAD']).reshape(49770,24),axis=1)[:n_d_points]
+Psurf_dmax = np.max(np.array(met_dict['sf_pressure']).reshape(49770,24),axis=1)[:n_d_points]
+SH_dmax    = np.max(np.array(met_dict['sp_humidity']).reshape(49770,24),axis=1)[:n_d_points]
+
+
+lat = np.array(pheno_dict['lat'])[:n_d_points]
+lon = np.array(pheno_dict['long'])[:n_d_points]
+avgN= np.array(pheno_dict['avgN'])[:n_d_points]
+LAI_pheno=np.array(pheno_dict['LAI'])[:n_d_points]
+avg_airt=np.array(pheno_dict['avg_airt'])[:n_d_points]
+
+BL_index=np.where(PFT==0)[0]
+BL_hLAI_index=np.where( (PFT==0) & (LAI>5) )[0]
+
+C3_index=np.where(PFT==2)[0]
+C3_hLAI_index=np.where( (PFT==2) & (LAI>5) )[0]
+
+y_data=GPP
+
+x_data=SWRAD_dmax
+plt.subplot(3,4,1)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.ylabel('GPP')
+plt.xlabel('SWRAD')
+
+x_data=LWRAD_dmax
+plt.subplot(3,4,2)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('LWRAD')
+
+x_data=SH_dmax
+plt.subplot(3,4,3)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('Spec. Hum.')
+
+x_data=airt_dmax
+plt.subplot(3,4,4)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('air temp.')
+
+x_data=co2_dmax
+plt.subplot(3,4,5)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('co2')
+plt.ylabel('GPP')
+
+x_data=avgN
+plt.subplot(3,4,6)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('Leaf Nitrogen')
+
+
+x_data=SM
+plt.subplot(3,4,7)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('Soil Moist.')
+
+x_data=TSOIL
+plt.subplot(3,4,8)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('T soil (JULES)')
+
+x_data=LAI
+plt.subplot(3,4,9)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('LAI')
+plt.ylabel('GPP')
+
+x_data=NPP
+plt.subplot(3,4,10)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('NPP')
+
+x_data=lat
+plt.subplot(3,4,11)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('Latitude')
+
+x_data=lon
+plt.subplot(3,4,12)
+plt.plot(x_data,y_data,ls='',marker='.')
+plt.plot(x_data[BL_index],y_data[BL_index],ls='',marker='.',color='red')
+plt.plot(x_data[BL_hLAI_index],y_data[BL_hLAI_index],ls='',marker='.',color='green')
+plt.xlabel('Longitude')
+
+
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

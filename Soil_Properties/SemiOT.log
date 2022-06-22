@@ -1,0 +1,16 @@
+Reading: /prj/GREENHOUSE/SOIL_PROPERTIES/datasets/England_Wales_Soil_Data/LDE16_12_SRUC_Tarsitano/EnW_Soil_WeightedComposition_CHESSgrid_ECOSSElayers_OT.nc
+Reading: /prj/GREENHOUSE/SOIL_PROPERTIES/datasets/Scotland_Soil_Data/Scot_Soil_WeightedComposition_CHESSgrid_ECOSSElayers_SEMI.nc
+Merging Data
+Merging Data
+Merging Data
+Merging Data
+Merging Data
+Merging Data
+Filling Gaps Laterally
+sand
+silt
+clay
+Bulk_Density
+org_carb
+ph
+Writing composition data to: /prj/GREENHOUSE/SOIL_PROPERTIES/datasets/Merged_Soil_WeightedComposition_CHESSgrid_ECOSSElayers_SemiOT.nc

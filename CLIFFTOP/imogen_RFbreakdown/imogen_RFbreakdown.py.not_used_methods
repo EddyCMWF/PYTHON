@@ -1,0 +1,363 @@
+# Time decaying offset term
+#   eps = eps_0 + eps_1*exp[-gamma*t]
+if l_Offset_DecayOffset:
+    if os.path.isfile(out_dir+'co2_ppm_DecOff.npy'):
+        dq_co2_all_DecOff     = np.load(out_dir+'dq_co2_DecOff.npy')
+        dq_non_co2_all_DecOff = np.load(out_dir+'dq_non_co2_DecOff.npy')
+        epsilon_0_all_DecOff  = np.load(out_dir+'epsilon_0_DecOff.npy')
+        epsilon_1_all_DecOff  = np.load(out_dir+'epsilon_1_DecOff.npy')
+        co2_ppm_all_DecOff    = np.load(out_dir+'co2_ppm_DecOff.npy')
+    else:
+        # Start with dq_non_co2 as the residual between dq and dq_co2_ssp for the whole time-series
+        dq_non_co2_all_DecOff = dq_all - dq_co2_ssp[...,np.newaxis]
+        
+        # Calculate the gradient od dq, dq_CO2 and dq_nonCO2 at the now index year
+        dDelq_dt       = dq_all[now_index,:] - dq_all[now_index-1,:] 
+        dDelqCO2_dt    = (dq_co2_ssp[now_index] - dq_co2_ssp[now_index-1])[...,np.newaxis]
+        dDelqNonCO2_dt = dq_non_co2_all_DecOff[now_index,:] - dq_non_co2_all_DecOff[now_index-1,:] 
+        dDelqNonCO2_dt_ssp = (dq_non_co2_ssp[now_index] - dq_non_co2_ssp[now_index-1])[...,np.newaxis]
+        
+#if True:
+        gamma = 0.1
+        # calculate epsilon_1 = -1/[gamma*e^-(gamma*t)] [ dDelQ_T/dt - dDelQCO2_ssp/dt - dDelQnonCO2_ssp/dt ]
+        # @t=0   -> epsilon_1 = -(1/gamma)*[ dDelQ_T/dt - dDelQCO2_ssp/dt - dDelQnonCO2_ssp/dt ]
+        epsilon_1_all_DecOff =  (-1./gamma) * (dDelq_dt - dDelqCO2_dt - dDelqNonCO2_dt_ssp)
+        #epsilon_1_all_DecOff =  -(1/gamma) *(dDelqNonCO2_dt - dDelqNonCO2_dt_ssp)  # Equivalent to line above
+
+        # calculate espilon_0 = DelQ_T - DelQCO2_ssp - (1+epsilon_1)*delQnonCO2_ssp
+        epsilon_0_all_DecOff = ( dq_all[now_index,:] - dq_co2_ssp[now_index][...,np.newaxis] 
+                                - dq_non_co2_ssp[now_index,np.newaxis] ) - epsilon_1_all_DecOff
+
+        epsilon_t_all_DecOff =  epsilon_0_all_DecOff[np.newaxis,...]  \
+                          + (epsilon_1_all_DecOff[np.newaxis,...]*np.exp(-gamma*(yr_plot-yr_now))[...,np.newaxis])
+        # for period after now_index, dq_non_co2 is the ssp value - offset
+        dq_non_co2_all_DecOff[now_index:,:] =  dq_non_co2_ssp[now_index:,np.newaxis] + epsilon_t_all_DecOff[now_index:,:] 
+        
+        # Can now Calculate CO2 from dq and dq_non_co2, we do whole time period to check conservation
+        dq_co2_all_DecOff = dq_all - dq_non_co2_all_DecOff
+
+        # Calculate the co2 due to the RF time series:
+        if Etminan:
+            # Iterative solution, so must be done gcm by gcm:
+            co2_ppm_all_DecOff = np.array( [ delQ.etminan_CO2_inverse_series(dq_co2_all_DecOff[:,igcm],
+                                   n2o_ppb_ssp, co2_ppm_0=co2_ppm_ssp[0], n2o_ppb_0=n2o_ppb_ssp[0])
+                           for igcm in range(n_cmip5) ]).transpose()
+        else:
+            co2_ppm_all_DecOff = co2_ppm_ssp[0] * np.exp((np.log(2.0)*dq_co2_all_DecOff)/q2co2)
+                
+        np.save(out_dir+'dq_co2_DecOff.npy',dq_co2_all_DecOff)
+        np.save(out_dir+'dq_non_co2_DecOff.npy',dq_non_co2_all_DecOff)
+        np.save(out_dir+'epsilon_0_DecOff.npy',epsilon_0_all_DecOff)
+        np.save(out_dir+'epsilon_1_DecOff.npy',epsilon_1_all_DecOff)
+        np.save(out_dir+'co2_ppm_DecOff.npy',co2_ppm_all_DecOff)
+
+    if os.path.isfile(out_dir+'delta_co2_GtC_DecOff.npy'):
+        d_land_GtC_all_DecOff   = np.load(out_dir+'d_land_GtC_DecOff.npy')
+        d_ocean_GtC_all_DecOff  = np.load(out_dir+'d_ocean_GtC_DecOff.npy')
+        co2_emissions_all_DecOff  = np.load(out_dir+'co2_emissions_GtC_DecOff.npy')
+        d_atmos_GtC_all_DecOff  = np.load(out_dir+'d_atmos_GtC_DecOff.npy')
+    else:
+#if True:
+        print('Calculating Emissions for constant offset and scale factor method')
+        d_atmos_GtC_all_DecOff = co2ppm_to_datmosGtC(co2_ppm_all_DecOff)[...,np.newaxis]
+    
+        d_ocean_GtC_all_DecOff = co2nT_to_deltaOceanGtC(co2_ppm_all_DecOff, d_atmos_GtC_all_DecOff,
+                                                     delta_temp_global_all,delta_temp_ocean_all,
+                                                     ocean_model=ocean_model)
+
+        d_land_GtC_all_DecOff = co2nT_to_deltaLandGtC(co2_ppm_all_DecOff, d_atmos_GtC_all_DecOff, d_ocean_GtC_all_DecOff, 
+                                                    delta_temp_global_all, land_model=land_model )
+
+        co2_emissions_GtC_all_DecOff = d_land_GtC_all_DecOff + d_atmos_GtC_all_DecOff + d_ocean_GtC_all_DecOff
+        
+        np.save(out_dir+'d_ocean_GtC_DecOff.npy',d_ocean_GtC_all_DecOff)
+        np.save(out_dir+'d_land_GtC_DecOff.npy',d_land_GtC_all_DecOff)
+        np.save(out_dir+'co2_emissions_GtC_DecOff.npy',co2_emissions_GtC_all_DecOff)
+        np.save(out_dir+'delta_co2_GtC_DecOff.npy',d_atmos_GtC_all_DecOff)
+
+    METHOD_DICT['Offset_DecayOffset']= {'dtemp_global':delta_temp_global_all,
+                                        'dq_co2':dq_co2_all_DecOff,
+                                        'dq_non_co2':dq_non_co2_all_DecOff,
+                                        'co2_ppm':co2_ppm_all_DecOff,
+                                        'd_co2_GtC':d_atmos_GtC_all_DecOff,
+                                        'co2_emissions':co2_emissions_GtC_all_DecOff,
+                                        'ocean_uptake':d_ocean_GtC_all_DecOff,
+                                        'land_uptake':d_land_GtC_all_DecOff,
+                                        'cum_colour':'#fdbf6f',
+                                        'colour':'#ff7f00',
+                                        }
+
+
+
+# Time decaying offset term
+#   eps =  eps_1*exp[-gamma*t]
+if l_DecayOffset:
+    if os.path.isfile(out_dir+'co2_ppm_DecOff.npy'):
+        dq_co2_all_DecOff     = np.load(out_dir+'dq_co2_DecOff.npy')
+        dq_non_co2_all_DecOff = np.load(out_dir+'dq_non_co2_DecOff.npy')
+        epsilon_0_all_DecOff  = np.load(out_dir+'epsilon_0_DecOff.npy')
+        epsilon_1_all_DecOff  = np.load(out_dir+'epsilon_1_DecOff.npy')
+        co2_ppm_all_DecOff    = np.load(out_dir+'co2_ppm_DecOff.npy')
+    else:
+        # Start with dq_non_co2 as the residual between dq and dq_co2_ssp for the whole time-series
+        dq_non_co2_all_DecOff = dq_all - dq_co2_ssp[...,np.newaxis]
+        
+        # Calculate the gradient od dq, dq_CO2 and dq_nonCO2 at the now index year
+        dDelq_dt       = dq_all[now_index,:] - dq_all[now_index-1,:] 
+        dDelqCO2_dt    = (dq_co2_ssp[now_index] - dq_co2_ssp[now_index-1])[...,np.newaxis]
+        dDelqNonCO2_dt = dq_non_co2_all_DecOff[now_index,:] - dq_non_co2_all_DecOff[now_index-1,:] 
+        dDelqNonCO2_dt_ssp = (dq_non_co2_ssp[now_index] - dq_non_co2_ssp[now_index-1])[...,np.newaxis]
+        
+#if True:
+        # calculate epsilon = 1/[e^-(gamma*t)] [ delQ_T - DelQCO2_ssp - DelQnonCO2_ssp ]
+        # @t=0   -> epsilon_1 =  DelQ_T - DelQCO2_ssp - DelQnonCO2_ssp 
+        epsilon_all_DecOff =  dq_all[now_index,:] - dq_co2_ssp[now_index,np.newaxis] - dq_non_co2_ssp[now_index,np.newaxis]
+        
+        # calculate gamma = [ dDelQ_T/dt - dDelQCO2_ssp/dt - dDelQnonCO2_ssp/dt ] * 1/(epsilon*e^-gamma.t)
+        # @ t=0 gamma = [ dDelQ_T/dt - dDelQCO2_ssp/dt - dDelQnonCO2_ssp/dt ] * 1/epsilon
+        gamma_all_DecOff = (-1./epsilon_all_DecOff) * (dDelq_dt - dDelqCO2_dt - dDelqNonCO2_dt_ssp)
+
+        epsilon_t_all_DecOff =  epsilon_all_DecOff[np.newaxis,...] \
+                            * np.exp(-gamma_all_DecOff[np.newaxis,...]*(yr_plot-yr_now)[...,np.newaxis])
+        # for period after now_index, dq_non_co2 is the ssp value - offset
+        dq_non_co2_all_DecOff[now_index:,:] =  dq_non_co2_ssp[now_index:,np.newaxis] + epsilon_t_all_DecOff[now_index:,:] 
+        
+        # Can now Calculate CO2 from dq and dq_non_co2, we do whole time period to check conservation
+        dq_co2_all_DecOff = dq_all - dq_non_co2_all_DecOff
+
+        # Calculate the co2 due to the RF time series:
+        if Etminan:
+            # Iterative solution, so must be done gcm by gcm:
+            co2_ppm_all_DecOff = np.array( [ delQ.etminan_CO2_inverse_series(dq_co2_all_DecOff[:,igcm],
+                                   n2o_ppb_ssp, co2_ppm_0=co2_ppm_ssp[0], n2o_ppb_0=n2o_ppb_ssp[0])
+                           for igcm in range(n_cmip5) ]).transpose()
+        else:
+            co2_ppm_all_DecOff = co2_ppm_ssp[0] * np.exp((np.log(2.0)*dq_co2_all_DecOff)/q2co2)
+                
+        np.save(out_dir+'dq_co2_DecOff.npy',dq_co2_all_DecOff)
+        np.save(out_dir+'dq_non_co2_DecOff.npy',dq_non_co2_all_DecOff)
+        np.save(out_dir+'epsilon_0_DecOff.npy',epsilon_0_all_DecOff)
+        np.save(out_dir+'epsilon_1_DecOff.npy',epsilon_1_all_DecOff)
+        np.save(out_dir+'co2_ppm_DecOff.npy',co2_ppm_all_DecOff)
+
+
+# Time decaying offset term and one over t term
+#   eps =  eps_0*exp[-gamma*t] + eps_1/(t+1)
+if l_DecayOffset:
+    if os.path.isfile(out_dir+'co2_ppm_DecOff.npy'):
+        dq_co2_all_DecOff     = np.load(out_dir+'dq_co2_DecOff.npy')
+        dq_non_co2_all_DecOff = np.load(out_dir+'dq_non_co2_DecOff.npy')
+        epsilon_0_all_DecOff  = np.load(out_dir+'epsilon_0_DecOff.npy')
+        epsilon_1_all_DecOff  = np.load(out_dir+'epsilon_1_DecOff.npy')
+        co2_ppm_all_DecOff    = np.load(out_dir+'co2_ppm_DecOff.npy')
+    else:
+#if True:
+        # Start with dq_non_co2 as the residual between dq and dq_co2_ssp for the whole time-series
+        dq_non_co2_all_DecOff = dq_all - dq_co2_ssp[...,np.newaxis]
+        
+        # Calculate the gradient od dq, dq_CO2 and dq_nonCO2 at the now index year
+        dDelq_dt       = dq_all[now_index,:] - dq_all[now_index-1,:] 
+        dDelqCO2_dt    = (dq_co2_ssp[now_index] - dq_co2_ssp[now_index-1])[...,np.newaxis]
+        dDelqNonCO2_dt = dq_non_co2_all_DecOff[now_index,:] - dq_non_co2_all_DecOff[now_index-1,:] 
+        dDelqNonCO2_dt_ssp = (dq_non_co2_ssp[now_index] - dq_non_co2_ssp[now_index-1])[...,np.newaxis]
+        
+        gamma=0.1
+        # calculate epsilon = 1/[e^-(gamma*t)] [ delQ_T - DelQCO2_ssp - DelQnonCO2_ssp ]
+        # @t=0   -> epsilon_1 =  DelQ_T - DelQCO2_ssp - DelQnonCO2_ssp 
+        epsilon_0_all_DecOff = (  ( dDelqCO2_dt + dq_co2_ssp[now_index,np.newaxis] ) 
+                                + ( dDelqNonCO2_dt_ssp + dq_non_co2_ssp[now_index,np.newaxis] ) 
+                                - ( dDelq_dt + dq_all[now_index,:] )
+                                ) / (gamma-1.)
+
+
+        epsilon_1_all_DecOff = (  dq_all[now_index,:] - dq_co2_ssp[now_index,np.newaxis] 
+                                - dq_non_co2_ssp[now_index,np.newaxis] - epsilon_0_all_DecOff ) 
+                                
+        epsilon_t_all_DecOff =  (epsilon_0_all_DecOff[np.newaxis,...]*np.exp(-gamma*(yr_plot-yr_now)[...,np.newaxis]))  \
+                              + (epsilon_1_all_DecOff[np.newaxis,...] / (1+(yr_plot-yr_now)[...,np.newaxis]))
+
+        # for period after now_index, dq_non_co2 is the ssp value - offset
+        dq_non_co2_all_DecOff[now_index:,:] =  dq_non_co2_ssp[now_index:,np.newaxis] + epsilon_t_all_DecOff[now_index:,:] 
+        
+        # Can now Calculate CO2 from dq and dq_non_co2, we do whole time period to check conservation
+        dq_co2_all_DecOff = dq_all - dq_non_co2_all_DecOff
+
+        # Calculate the co2 due to the RF time series:
+        if Etminan:
+            # Iterative solution, so must be done gcm by gcm:
+            co2_ppm_all_DecOff = np.array( [ delQ.etminan_CO2_inverse_series(dq_co2_all_DecOff[:,igcm],
+                                   n2o_ppb_ssp, co2_ppm_0=co2_ppm_ssp[0], n2o_ppb_0=n2o_ppb_ssp[0])
+                           for igcm in range(n_cmip5) ]).transpose()
+        else:
+            co2_ppm_all_DecOff = co2_ppm_ssp[0] * np.exp((np.log(2.0)*dq_co2_all_DecOff)/q2co2)
+                
+        np.save(out_dir+'dq_co2_DecOff.npy',dq_co2_all_DecOff)
+        np.save(out_dir+'dq_non_co2_DecOff.npy',dq_non_co2_all_DecOff)
+        np.save(out_dir+'epsilon_0_DecOff.npy',epsilon_0_all_DecOff)
+        np.save(out_dir+'epsilon_1_DecOff.npy',epsilon_1_all_DecOff)
+        np.save(out_dir+'co2_ppm_DecOff.npy',co2_ppm_all_DecOff)
+
+
+
+
+if True:
+    plt.plot(yr_plot,dq_non_co2_all_DecOff)
+    plt.plot(yr_plot,dq_non_co2_ssp,c='k',lw=3)
+    plt.plot([yr_now,yr_now],plt.ylim(),c='k',ls='--')
+    plt.show()
+        # epsilon and it's second time derivative need to be opposite sign.
+        # If they are the same sign then the implication is for epsilon to accelerate away from zero in the initial period.
+        #  the gamma approach produces a huge spike and only settles after a large spike.
+        
+        
+        # Calculate second derivative at t0, and it's sign:
+        #d2_epsilon_t0 = (epsilon_1_all_DecOff**2. - 2*gamma_all_DecOff)*epsilon_0_all_DecOff
+        #d2_eps_t0_sign = d2_epsilon_t0/np.abs(d2_epsilon_t0)
+        #opposign = eps_t0_sign!=d2_eps_t0_sign
+        #samesign = eps_t0_sign==d2_eps_t0_sign
+
+        # If epsilon and d^2epsilon/dt^2 are opposite sign,
+        #  behaving as an oscilator, so we can keep our gamma method, i.e. gamma = (eps1*t_stab-ln( tau/eps_0))/t^2
+        # If they are the same sign then the implication is for epsilon to accelerate away from zero in the initial period,
+        #  the gamma approach produces a huge spike and only settles after a large spike.
+        # we therfore overide and fill with a constant gamma term/equal to the eps_1 term
+        #gamma_oppo = 0.01
+        #eps_max = 
+        #gamma_all_DecOff[samesign] = np.abs(epsilon_1_all_DecOff[samesign])/10 #gamma_oppo
+        #gamma_all_DecOff[samesign] = (epsilon_1_all_DecOff[samesign]**2.)/2. #gamma_oppo
+
+
+#if True:
+    #plt.plot(yr_plot,epsilon_t_all_DecOff) 
+    #plt.plot(yr_plot,dq_non_co2_ssp,c='k',lw=3)
+    #plt.plot([yr_now,yr_now],plt.ylim(),c='k',ls='--')
+    #plt.show()
+    #plt.plot(yr_plot,epsilon_t_all_DecOff+dq_non_co2_ssp[...,np.newaxis]) 
+    #plt.plot(yr_plot,dq_non_co2_ssp,c='k',lw=3)
+    #plt.plot([yr_now,yr_now],plt.ylim(),c='k',ls='--')
+    #plt.show()
+    #plt.plot(yr_plot,dq_co2_all_DecOff)
+    #plt.plot(yr_plot,dq_co2_ssp,c='k',lw=3)
+    #plt.plot([yr_now,yr_now],plt.ylim(),c='k',ls='--')
+    #plt.show()
+    #plt.plot(yr_plot,dq_non_co2_all_DecOff)
+    #plt.plot(yr_plot,dq_non_co2_ssp,c='k',lw=3)
+    #plt.plot([yr_now,yr_now],plt.ylim(),c='k',ls='--')
+    #plt.show()
+
+#  eps =  eps_0 * exp[ eps_1*t - gamma*t^2 ]
+if l_DecayOffset:
+    if os.path.isfile(out_dir+'co2_ppm_DecOff.npy'):
+        dq_co2_all_DecOff     = np.load(out_dir+'dq_co2_DecOff.npy')
+        dq_non_co2_all_DecOff = np.load(out_dir+'dq_non_co2_DecOff.npy')
+        epsilon_0_all_DecOff  = np.load(out_dir+'epsilon_0_DecOff.npy')
+        epsilon_1_all_DecOff  = np.load(out_dir+'epsilon_1_DecOff.npy')
+        co2_ppm_all_DecOff    = np.load(out_dir+'co2_ppm_DecOff.npy')
+    else:
+        print('Calculating Emissions for decaying offset method')
+        # Start with dq_non_co2 as the residual between dq and dq_co2_ssp for the whole time-series
+        dq_non_co2_all_DecOff = dq_all - dq_co2_ssp[...,np.newaxis]
+        
+        # Calculate the gradient od dq, dq_CO2 and dq_nonCO2 at the now index year
+        dDelq_dt       = dq_all[now_index,:] - dq_all[now_index-1,:] 
+        dDelqCO2_dt    = (dq_co2_ssp[now_index] - dq_co2_ssp[now_index-1])[...,np.newaxis]
+        #dDelqNonCO2_dt = dq_non_co2_all_DecOff[now_index,:] - dq_non_co2_all_DecOff[now_index-1,:] 
+        dDelqNonCO2_dt_ssp = (dq_non_co2_ssp[now_index] - dq_non_co2_ssp[now_index-1])[...,np.newaxis]
+
+        # Calcualtate the residuals of the gradient and the absolute at present day stage:
+        dDelQ_resid = dDelq_dt - dDelqCO2_dt - dDelqNonCO2_dt_ssp
+        dQ_resid = dq_all[now_index,:] - dq_co2_ssp[now_index,np.newaxis] -  dq_non_co2_ssp[now_index,np.newaxis]
+
+        epsilon_0_all_DecOff = dQ_resid[np.newaxis,...]
+
+        epsilon_1_all_DecOff = (dDelQ_resid / dQ_resid)[np.newaxis,...]
+        
+        epsilon_t0    = epsilon_0_all_DecOff 
+        #d_epsilon_t0  = epsilon_1_all_DecOff*epsilon_0_all_DecOff
+        # sign of epsilon_t0 (offset)
+        eps_t0_sign = epsilon_t0/np.abs(epsilon_t0)
+        
+        # calculate gamma as the minimum value that satisfies the following conditions:
+        # 1. stability end_year, i.e. epsilon_t < threshold @ t=end_year
+        # 2. epsilon and d2epsilon/dt2 must have opposite signs, such that the system behaves as an oscilator,
+        #     i.e. returning to zero.
+        #
+        # 1:
+        eps_stab = epsilon_stable * eps_t0_sign  # epsilon at stability with the correct sign
+        t_stab   = end_year-yr_now               # time to stability
+        gamma_all_DecOff = (  epsilon_1_all_DecOff*t_stab 
+                           - np.log(eps_stab/epsilon_0_all_DecOff))/(t_stab**2)
+        
+        # 2: Condition statisfied when gamma > epsilon_1**2 / 2  (see paper/notes)
+        index_2 = gamma_all_DecOff < (epsilon_1_all_DecOff**2.)/2
+        gamma_all_DecOff[index_2] = (epsilon_1_all_DecOff[index_2]**2.)/2 
+        
+        # 3: Condition that gamma > -epsilon_1:
+        index_3 = np.abs(gamma_all_DecOff)<np.abs(epsilon_1_all_DecOff)
+        gamma_all_DecOff[index_3] = epsilon_1_all_DecOff[index_3]*-1.
+        ipdb.set_trace()
+
+        # Calculate the epsilon term as a function of time
+        t = (yr_plot-yr_now)[...,np.newaxis]
+        epsilon_t_all_DecOff = epsilon_0_all_DecOff * np.exp( (epsilon_1_all_DecOff*t) 
+                                                            - (gamma_all_DecOff * t**2 ) )
+        #epsilon_t_all_DecOff[:now_index,:] = 0.0
+        
+        # for period after now_index, dq_non_co2 is the ssp value - offset
+        dq_non_co2_all_DecOff[now_index:,:] =  dq_non_co2_ssp[now_index:,np.newaxis] + epsilon_t_all_DecOff[now_index:,:] 
+        
+        # Can now Calculate CO2 from dq and dq_non_co2, we do whole time period to check conservation
+        dq_co2_all_DecOff = dq_all - dq_non_co2_all_DecOff
+
+        # Calculate the co2 due to the RF time series:
+        if Etminan:
+            # Iterative solution, so must be done gcm by gcm:
+            co2_ppm_all_DecOff = np.array( [ delQ.etminan_CO2_inverse_series(dq_co2_all_DecOff[:,igcm],
+                                   n2o_ppb_ssp, co2_ppm_0=co2_ppm_ssp[0], n2o_ppb_0=n2o_ppb_ssp[0])
+                           for igcm in range(n_cmip5) ]).transpose()
+        else:
+            co2_ppm_all_DecOff = co2_ppm_ssp[0] * np.exp((np.log(2.0)*dq_co2_all_DecOff)/q2co2)
+        np.save(out_dir+'dq_co2_DecOff.npy',dq_co2_all_DecOff)
+        np.save(out_dir+'dq_non_co2_DecOff.npy',dq_non_co2_all_DecOff)
+        np.save(out_dir+'epsilon_0_DecOff.npy',epsilon_0_all_DecOff)
+        np.save(out_dir+'epsilon_1_DecOff.npy',epsilon_1_all_DecOff)
+        np.save(out_dir+'co2_ppm_DecOff.npy',co2_ppm_all_DecOff)
+
+    if os.path.isfile(out_dir+'d_atmos_GtC_DecOff.npy'):
+        d_land_GtC_all_DecOff   = np.load(out_dir+'d_land_GtC_DecOff.npy')
+        d_ocean_GtC_all_DecOff  = np.load(out_dir+'d_ocean_GtC_DecOff.npy')
+        co2_emissions_GtC_all_DecOff  = np.load(out_dir+'co2_emissions_GtC_DecOff.npy')
+        d_atmos_GtC_all_DecOff  = np.load(out_dir+'d_atmos_GtC_DecOff.npy')
+    else:
+        print('Calculating Emissions for decay offset method')
+        d_atmos_GtC_all_DecOff = co2ppm_to_datmosGtC(co2_ppm_all_DecOff)[...,np.newaxis]
+        ipdb.set_trace()
+    
+        d_ocean_GtC_all_DecOff = co2nT_to_deltaOceanGtC(co2_ppm_all_DecOff, d_atmos_GtC_all_DecOff,
+                                                     delta_temp_global_all,delta_temp_ocean_all,
+                                                     ocean_model=ocean_model)
+
+        d_land_GtC_all_DecOff = co2nT_to_deltaLandGtC(co2_ppm_all_DecOff, d_atmos_GtC_all_DecOff, d_ocean_GtC_all_DecOff, 
+                                                    delta_temp_global_all, land_model=land_model )
+
+        co2_emissions_GtC_all_DecOff = d_land_GtC_all_DecOff + d_atmos_GtC_all_DecOff + d_ocean_GtC_all_DecOff
+        ipdb.set_trace()
+        
+        np.save(out_dir+'d_ocean_GtC_DecOff.npy',d_ocean_GtC_all_DecOff)
+        np.save(out_dir+'d_land_GtC_DecOff.npy',d_land_GtC_all_DecOff)
+        np.save(out_dir+'co2_emissions_GtC_DecOff.npy',co2_emissions_GtC_all_DecOff)
+        np.save(out_dir+'d_atmos_GtC_DecOff.npy',d_atmos_GtC_all_DecOff)
+
+    METHOD_DICT['DecayOffset']= {'dtemp_global':delta_temp_global_all,
+                                 'dq':dq_all,
+                                 'dq_co2':dq_co2_all_DecOff,
+                                 'dq_non_co2':dq_non_co2_all_DecOff,
+                                 'co2_ppm':co2_ppm_all_DecOff,
+                                 'd_co2_GtC':d_atmos_GtC_all_DecOff,
+                                 'co2_emissions':co2_emissions_GtC_all_DecOff,
+                                 'ocean_uptake':d_ocean_GtC_all_DecOff,
+                                 'land_uptake':d_land_GtC_all_DecOff,
+                                 'cum_colour':'#fdbf6f',    # Shades of red for decay offset
+                                 'colour':'#ff7f00',
+                                 }
+
